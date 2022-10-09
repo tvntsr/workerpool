@@ -7,41 +7,9 @@ import (
 	"sync"
 )
 
-type WorkStatus int
-
-const (
-	Available WorkStatus = iota
-	Waiting
-	Working
-	Finished
-	Error
-)
-
-type WorkerTask struct {
-	lock   sync.Mutex
-	status WorkStatus
-	id     int
-
-	comm chan func() error
-}
-
-func createWorkerTask(id int) (*WorkerTask, error) {
-	task := WorkerTask{
-		status: Available,
-		id:     id,
-		comm:   make(chan func() error),
-	}
-	return &task, nil
-}
-
-func (wt *WorkerTask) setStatus(status WorkStatus) {
-	wt.lock.Lock()
-	defer wt.lock.Unlock()
-	wt.status = status
-
-}
-
 type WorkerPool struct {
+	lock sync.Mutex
+
 	max_size  int
 	tasks     map[int]*WorkerTask
 	available []*WorkerTask
@@ -50,13 +18,49 @@ type WorkerPool struct {
 func NewWorkerPool(size int) (*WorkerPool, error) {
 
 	return &WorkerPool{
-		max_size:  size,
+		lock:     sync.Mutex{},
+		max_size: size,
+
 		available: nil,
 	}, nil
 }
 
+func (w *WorkerPool) markTaskBusy(task *WorkerTask) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	for i, e := range w.available {
+		if e.id == task.id {
+			w.available = append(w.available[:i], w.available[i+1:]...)
+			break
+		}
+	}
+
+	task.setStatus(Working, nil, nil)
+}
+
+func (w *WorkerPool) markTaskAvailable(task *WorkerTask) error {
+	if task.getStatus() == Available {
+		return nil
+	}
+
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	_, ok := w.tasks[task.id]
+	if !ok {
+		return fmt.Errorf("Bad task")
+	}
+
+	task.setStatus(Available, nil, nil)
+
+	w.available = append(w.available, task)
+	return nil
+}
+
 func (w *WorkerPool) Start() error {
 	w.available = make([]*WorkerTask, w.max_size)
+	w.tasks = make(map[int]*WorkerTask)
 
 	for i := 0; i < w.max_size; i++ {
 		task, err := createWorkerTask(i)
@@ -67,21 +71,18 @@ func (w *WorkerPool) Start() error {
 		w.available[i] = task
 		go func(task *WorkerTask) {
 			for {
-				task.setStatus(Available)
+				task.setStatus(Available, nil, nil)
 
 				worker := <-task.comm
 				if worker == nil {
 					break
 				}
-				task.setStatus(Working)
-				// ::TODO:: move to busy list
-				err := worker()
-				// ::TODO:: Move to available list
+				w.markTaskBusy(task)
+				res, err := worker()
 				if err != nil {
-					task.setStatus(Error)
+					task.setStatus(Error, res, err)
 				} else {
-					task.setStatus(Finished)
-
+					task.setStatus(Finished, res, nil)
 				}
 			}
 		}(task)
@@ -101,20 +102,31 @@ func (w *WorkerPool) Stop() error {
 	return nil
 }
 
-func (w *WorkerPool) PushTask(f func() error) error {
-	// ::TODO:: allow grow if max allow it
+func (w *WorkerPool) PushTask(f func() (interface{}, error)) (Task, error) {
+	// ::TODO:: allow grow if max allows it
 
-	// Should it be lock here?
+	// Should it be lock-ed here?
 	if len(w.available) == 0 {
-		return fmt.Errorf("Pool is overloaded")
+		return nil, fmt.Errorf("Pool is overloaded")
 	}
 
+	var t *WorkerTask
+
 	if len(w.available) > 0 {
-		var t *WorkerTask
+
 		t, w.available = w.available[0], w.available[1:]
 		//t, w.available := w.available[len(w.available)-1], w.available[:len(w.available)-1]
 		t.comm <- f
 	}
 
-	return nil
+	return t, nil
+}
+
+func (w *WorkerPool) ReleaseTask(task Task) error {
+	working_task, ok := task.(*WorkerTask)
+	if !ok {
+		return fmt.Errorf("Wrong task type")
+	}
+
+	return w.markTaskAvailable(working_task)
 }
