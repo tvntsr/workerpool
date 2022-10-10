@@ -10,22 +10,40 @@ import (
 type WorkerPool struct {
 	lock sync.Mutex
 
-	max_size  int
-	tasks     map[int]*WorkerTask
-	available []*WorkerTask
+	max_size    int
+	tasks       map[int]*WorkerTask
+	available   []*WorkerTask
+	terminating *sync.WaitGroup
 }
 
 func NewWorkerPool(size int) (*WorkerPool, error) {
 
 	return &WorkerPool{
-		lock:     sync.Mutex{},
-		max_size: size,
-
-		available: nil,
+		lock:        sync.Mutex{},
+		max_size:    size,
+		tasks:       nil,
+		available:   nil,
+		terminating: nil,
 	}, nil
 }
 
 func (w *WorkerPool) markTaskBusy(task *WorkerTask) {
+	if task.IsAvailable() {
+		w.lock.Lock()
+		defer w.lock.Unlock()
+
+		for i, e := range w.available {
+			if e.id == task.id {
+				w.available = append(w.available[:i], w.available[i+1:]...)
+				break
+			}
+		}
+	}
+
+	task.setStatus(Working, nil, nil)
+}
+
+func (w *WorkerPool) markTaskTerminated(task *WorkerTask) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -36,7 +54,10 @@ func (w *WorkerPool) markTaskBusy(task *WorkerTask) {
 		}
 	}
 
-	task.setStatus(Working, nil, nil)
+	task.setStatus(Finished, nil, nil)
+
+	delete(w.tasks, task.id)
+	w.terminating.Done()
 }
 
 func (w *WorkerPool) markTaskAvailable(task *WorkerTask) error {
@@ -62,6 +83,8 @@ func (w *WorkerPool) Start() error {
 	w.available = make([]*WorkerTask, w.max_size)
 	w.tasks = make(map[int]*WorkerTask)
 
+	w.terminating = &sync.WaitGroup{}
+
 	for i := 0; i < w.max_size; i++ {
 		task, err := createWorkerTask(i)
 		if err != nil {
@@ -69,12 +92,13 @@ func (w *WorkerPool) Start() error {
 		}
 		w.tasks[i] = task
 		w.available[i] = task
+		w.terminating.Add(1)
+		task.setStatus(Available, nil, nil)
 		go func(task *WorkerTask) {
 			for {
-				task.setStatus(Available, nil, nil)
-
 				worker := <-task.comm
 				if worker == nil {
+					w.markTaskTerminated(task)
 					break
 				}
 				w.markTaskBusy(task)
@@ -93,11 +117,21 @@ func (w *WorkerPool) Start() error {
 
 func (w *WorkerPool) Stop() error {
 	// ::TODO::
-	// - check the status of the task
-	// - if task is working return error
-	for i := range w.tasks {
-		w.tasks[i].comm <- nil
+	// - should be error returned in case when task(s) busy?
+	if w.terminating == nil {
+		return nil // not started
 	}
+	{
+		w.lock.Lock()
+
+		for _, el := range w.tasks {
+			w.tasks[el.id].comm <- nil
+		}
+
+		w.lock.Unlock()
+	}
+
+	w.terminating.Wait()
 
 	return nil
 }
@@ -105,7 +139,9 @@ func (w *WorkerPool) Stop() error {
 func (w *WorkerPool) PushTask(f func() (interface{}, error)) (Task, error) {
 	// ::TODO:: allow grow if max allows it
 
-	// Should it be lock-ed here?
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
 	if len(w.available) == 0 {
 		return nil, fmt.Errorf("Pool is overloaded")
 	}
@@ -113,9 +149,9 @@ func (w *WorkerPool) PushTask(f func() (interface{}, error)) (Task, error) {
 	var t *WorkerTask
 
 	if len(w.available) > 0 {
-
 		t, w.available = w.available[0], w.available[1:]
 		//t, w.available := w.available[len(w.available)-1], w.available[:len(w.available)-1]
+		t.setStatus(Working, nil, nil)
 		t.comm <- f
 	}
 
@@ -126,6 +162,10 @@ func (w *WorkerPool) ReleaseTask(task Task) error {
 	working_task, ok := task.(*WorkerTask)
 	if !ok {
 		return fmt.Errorf("Wrong task type")
+	}
+
+	if working_task.IsAvailable() {
+		return fmt.Errorf("Wrong task state")
 	}
 
 	return w.markTaskAvailable(working_task)
