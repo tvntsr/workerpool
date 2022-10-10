@@ -182,3 +182,101 @@ func Test_WorkerPoolPushTooMuchTasks(t *testing.T) {
 		}
 	}
 }
+
+func Test_WorkerPooReleaseTask(t *testing.T) {
+	pool_size := 2
+
+	pool, err := NewWorkerPool(pool_size)
+	if err != nil {
+		t.Fatalf("Pool creating error %v", err)
+	}
+
+	err = pool.Start()
+	if err != nil {
+		t.Fatalf("Pool start error %v", err)
+	}
+
+	worker, err := pool.PushTask(func() (interface{}, error) {
+		time.Sleep(3 * time.Second)
+		return 1, nil
+	})
+
+	if err != nil {
+		t.Fatalf("Pool push task error %v", err)
+	}
+	if worker == nil {
+		t.Fatal("Worker is nil!")
+		t.FailNow()
+	}
+
+	ret, err := worker.WaitFinished()
+	if err != nil {
+		t.Fatalf("WaitFinished failed %v", err)
+	}
+	if ret != 1 {
+		t.Fatalf("Wrong value returned, %v", ret)
+	}
+
+	err = pool.ReleaseTask(worker)
+	if err != nil {
+		t.Fatalf("Release task failed %v", err)
+	}
+	if !worker.IsAvailable() {
+		t.Fatal("Worker must be available")
+	}
+	if len(pool.available) != pool_size {
+		t.Fatal("Worker was not returned to available list")
+	}
+}
+
+func Test_WorkerPooDoubleReleaseTask(t *testing.T) {
+	pool_size := 2
+
+	pool, err := NewWorkerPool(pool_size)
+	if err != nil {
+		t.Fatalf("Pool creating error %v", err)
+	}
+
+	err = pool.Start()
+	if err != nil {
+		t.Fatalf("Pool start error %v", err)
+	}
+
+	worker, err := pool.PushTask(func() (interface{}, error) {
+		time.Sleep(3 * time.Second)
+		return 1, nil
+	})
+
+	if err != nil {
+		t.Fatalf("Pool push task error %v", err)
+	}
+	if worker == nil {
+		t.Fatal("Worker is nil!")
+		t.FailNow()
+	}
+
+	ret, err := worker.WaitFinished()
+	if err != nil {
+		t.Fatalf("WaitFinished failed %v", err)
+	}
+	if ret != 1 {
+		t.Fatalf("Wrong value returned, %v", ret)
+	}
+
+	err = pool.ReleaseTask(worker)
+	if err != nil {
+		t.Fatalf("Release task failed %v", err)
+	}
+	if !worker.IsAvailable() {
+		t.Fatal("Worker must be available")
+	}
+
+	err = pool.ReleaseTask(worker)
+	if err == nil {
+		t.Fatalf("Release task should return error on second relese")
+	}
+	if !worker.IsAvailable() {
+		t.Fatal("Worker must be available after second release")
+	}
+
+}
