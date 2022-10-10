@@ -11,7 +11,6 @@ type WorkStatus int
 
 const (
 	Available WorkStatus = iota
-	Waiting
 	Working
 	Finished
 	Error
@@ -62,12 +61,12 @@ func (wt *WorkerTask) setStatus(status WorkStatus, result interface{}, err error
 	wt.cond.Broadcast()
 }
 
-func (wt *WorkerTask) IsWaiting() bool {
-	return wt.getStatus() == Waiting
+func (wt *WorkerTask) IsAvailable() bool {
+	return wt.getStatus() == Available
 }
 
 func (wt *WorkerTask) IsFinished() bool {
-	return wt.getStatus() == Waiting
+	return wt.getStatus() == Finished
 }
 
 func (wt *WorkerTask) IsWorking() bool {
@@ -86,9 +85,9 @@ func (wt *WorkerTask) Result() (interface{}, error) {
 
 func (wt *WorkerTask) WaitFinished() (interface{}, error) {
 	wt.cond.L.Lock()
-	if wt.status != Working {
+	if wt.status == Available {
 		wt.cond.L.Unlock()
-		return nil, fmt.Errorf("Worng status")
+		return nil, fmt.Errorf("Wrong status, %d", wt.status)
 	}
 
 	for {
