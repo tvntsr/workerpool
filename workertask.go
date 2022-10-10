@@ -17,12 +17,11 @@ const (
 )
 
 type WorkerTask struct {
-	managered bool
-	lock      sync.Mutex
-	status    WorkStatus
-	id        int
-	result    interface{}
-	error     error
+	lock   sync.Mutex
+	status WorkStatus
+	id     int
+	result interface{}
+	error  error
 
 	comm chan func() (interface{}, error)
 	cond *sync.Cond
@@ -30,14 +29,13 @@ type WorkerTask struct {
 
 func createWorkerTask(id int) (*WorkerTask, error) {
 	task := WorkerTask{
-		managered: true,
-		lock:      sync.Mutex{},
-		status:    Available,
-		id:        id,
-		result:    nil,
-		error:     nil,
-		comm:      make(chan func() (interface{}, error)),
-		cond:      nil,
+		lock:   sync.Mutex{},
+		status: Available,
+		id:     id,
+		result: nil,
+		error:  nil,
+		comm:   make(chan func() (interface{}, error)),
+		cond:   nil,
 	}
 
 	task.cond = sync.NewCond(&task.lock)
@@ -48,20 +46,6 @@ func (wt *WorkerTask) getStatus() WorkStatus {
 	wt.lock.Lock()
 	defer wt.lock.Unlock()
 	status := wt.status
-
-	return status
-}
-
-func (wt *WorkerTask) setManageredStatus(status bool) {
-	wt.lock.Lock()
-	defer wt.lock.Unlock()
-	wt.managered = status
-}
-
-func (wt *WorkerTask) isManagered() bool {
-	wt.lock.Lock()
-	defer wt.lock.Unlock()
-	status := wt.managered
 
 	return status
 }
