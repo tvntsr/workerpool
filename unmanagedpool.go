@@ -62,12 +62,17 @@ func (w *UnmanagedPool) markTaskTerminated(task *WorkerTask) {
 func (w *UnmanagedPool) getUnmanageredWork() func() (interface{}, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	if w.unmanaged == nil && len(w.unmanaged) == 0 {
+	if w.unmanaged == nil || len(w.unmanaged) == 0 {
 		return nil
 	}
 
 	var t func() (interface{}, error)
-	t, w.unmanaged = w.unmanaged[0], w.unmanaged[1:]
+	if len(w.unmanaged) == 1 {
+		t = w.unmanaged[0]
+		w.unmanaged = make([]func() (interface{}, error), 0)
+	} else {
+		t, w.unmanaged = w.unmanaged[0], w.unmanaged[1:]
+	}
 
 	return t
 }
