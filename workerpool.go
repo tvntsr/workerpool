@@ -10,9 +10,10 @@ import (
 type WorkerPool struct {
 	lock sync.Mutex
 
-	max_size    int
-	tasks       map[int]*WorkerTask
-	available   []*WorkerTask
+	max_size  int
+	tasks     map[int]*WorkerTask
+	available []*WorkerTask
+	//starting    *sync.WaitGroup
 	terminating *sync.WaitGroup
 	unmanaged   []func() (interface{}, error)
 	ucond       *sync.Cond
@@ -21,10 +22,11 @@ type WorkerPool struct {
 func NewWorkerPool(size int) (*WorkerPool, error) {
 
 	return &WorkerPool{
-		lock:        sync.Mutex{},
-		max_size:    size,
-		tasks:       nil,
-		available:   nil,
+		lock:      sync.Mutex{},
+		max_size:  size,
+		tasks:     nil,
+		available: nil,
+		//starting:    nil,
 		terminating: nil,
 		unmanaged:   nil,
 	}, nil
@@ -99,8 +101,12 @@ func (w *WorkerPool) getUnmanageredWork() func() (interface{}, error) {
 func (w *WorkerPool) Start() error {
 	w.available = make([]*WorkerTask, w.max_size)
 	w.tasks = make(map[int]*WorkerTask)
+	//w.starting = &sync.WaitGroup{}
 	w.terminating = &sync.WaitGroup{}
 	w.ucond = sync.NewCond(&w.lock)
+
+	//w.starting.Add(w.max_size)
+
 	for i := 0; i < w.max_size; i++ {
 		task, err := createWorkerTask(i)
 		if err != nil {
@@ -113,6 +119,7 @@ func (w *WorkerPool) Start() error {
 		task.setStatus(Available, nil, nil)
 
 		go func(task *WorkerTask) {
+			//w.starting.Done()
 			for {
 				worker := <-task.comm
 				if worker == nil {
@@ -156,11 +163,15 @@ func (w *WorkerPool) Stop() error {
 		w.lock.Lock()
 
 		for _, el := range w.tasks {
-			w.tasks[el.id].comm <- nil
+			ch := w.tasks[el.id].comm
+			w.lock.Unlock()
+
+			ch <- nil
+
+			w.lock.Lock()
 		}
 		w.lock.Unlock()
 	}
-
 	w.terminating.Wait()
 
 	return nil
@@ -226,6 +237,16 @@ func (w *WorkerPool) RunUnmanaged(f func() (interface{}, error)) error {
 		t.setManageredStatus(false)
 		t.comm <- f
 	}
+
+	return nil
+}
+
+func (w *WorkerPool) WaitAllStarted() error {
+	// if w.starting == nil {
+	// 	return fmt.Errorf("Pool not started")
+	// }
+
+	// w.starting.Wait()
 
 	return nil
 }
