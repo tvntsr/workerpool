@@ -20,5 +20,5 @@ usage:
 type Pool interface {
 	Start() error
 	Stop() error
-	PushTask(w func() error) error
+	PushTask(func() (interface{}, error)) (Task, error)
 }
