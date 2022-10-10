@@ -6,9 +6,7 @@ import (
 )
 
 func Test_WorkerTask(t *testing.T) {
-	var task Task
-
-	task = &WorkerTask{
+	task := &WorkerTask{
 		lock:   sync.Mutex{},
 		status: Available,
 		id:     1,
