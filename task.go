@@ -1,7 +1,7 @@
 package pool
 
 type Task interface {
-	IsWaiting() bool
+	IsAvailable() bool
 	IsFinished() bool
 	IsWorking() bool
 	IsError() bool
