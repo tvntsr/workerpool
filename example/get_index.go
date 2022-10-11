@@ -59,7 +59,7 @@ func main() {
 	}
 	defer file.Close()
 
-	pool, err := pool.NewWorkerPool(pool_size)
+	pool, err := pool.NewUnmanagedPool(pool_size)
 	if err != nil {
 		fmt.Printf("Error in pool creating %v, terminating...\n", err)
 		return
@@ -79,7 +79,7 @@ func main() {
 	for scanner.Scan() {
 		records++
 		rec := scanner.Text()
-		_ = pool.RunUnmanaged(func() (interface{}, error) {
+		_, err = pool.PushTask(func() (interface{}, error) {
 			fmt.Println("Checking", rec)
 			download_time, page_size, err := downloading("http://" + rec)
 			if err != nil {
@@ -91,6 +91,9 @@ func main() {
 			page_size_total += page_size
 			return nil, nil
 		})
+		if err != nil {
+			fmt.Printf("Cannot add tesk to the pool, %v", err)
+		}
 	}
 	//_ = pool.WaitAllStarted()
 
@@ -100,10 +103,6 @@ func main() {
 		fmt.Printf("Got error %v\n", err)
 	}
 
-	fmt.Println("Wait all")
-	_ = pool.WaitAllUnmanaged()
-
-	fmt.Println("Wait stop")
 	_ = pool.Stop()
 
 	fmt.Println("")

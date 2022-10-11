@@ -15,7 +15,6 @@ type WorkerPool struct {
 	available []*WorkerTask
 	//starting    *sync.WaitGroup
 	terminating *sync.WaitGroup
-	unmanaged   []func() (interface{}, error)
 	ucond       *sync.Cond
 }
 
@@ -28,7 +27,6 @@ func NewWorkerPool(size int) (*WorkerPool, error) {
 		available: nil,
 		//starting:    nil,
 		terminating: nil,
-		unmanaged:   nil,
 	}, nil
 }
 
@@ -84,20 +82,6 @@ func (w *WorkerPool) markTaskAvailable(task *WorkerTask) error {
 	return nil
 }
 
-func (w *WorkerPool) getUnmanageredWork() func() (interface{}, error) {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-	if w.unmanaged == nil && len(w.unmanaged) == 0 {
-		return nil
-	}
-
-	var t func() (interface{}, error)
-	t, w.unmanaged = w.unmanaged[0], w.unmanaged[1:]
-	w.ucond.Broadcast()
-
-	return t
-}
-
 func (w *WorkerPool) Start() error {
 	w.available = make([]*WorkerTask, w.max_size)
 	w.tasks = make(map[int]*WorkerTask)
@@ -128,19 +112,6 @@ func (w *WorkerPool) Start() error {
 				}
 				w.markTaskBusy(task)
 				res, err := worker()
-				if !task.isManagered() {
-					for {
-						t := w.getUnmanageredWork()
-						if t == nil {
-							break
-						}
-						_, _ = t()
-					}
-					task.setStatus(Available, nil, nil)
-
-					continue
-				}
-
 				if err != nil {
 					task.setStatus(Error, res, err)
 				} else {
@@ -189,13 +160,11 @@ func (w *WorkerPool) PushTask(f func() (interface{}, error)) (Task, error) {
 
 	var t *WorkerTask
 
-	if len(w.available) > 0 {
-		t, w.available = w.available[0], w.available[1:]
-		//t, w.available := w.available[len(w.available)-1], w.available[:len(w.available)-1]
-		t.setStatus(Working, nil, nil)
-		t.setManageredStatus(true)
-		t.comm <- f
-	}
+	t, w.available = w.available[0], w.available[1:]
+	//t, w.available := w.available[len(w.available)-1], w.available[:len(w.available)-1]
+	t.setStatus(Working, nil, nil)
+	//t.setManageredStatus(true)
+	t.comm <- f
 
 	return t, nil
 }
@@ -211,56 +180,4 @@ func (w *WorkerPool) ReleaseTask(task Task) error {
 	}
 
 	return w.markTaskAvailable(working_task)
-}
-
-func (w *WorkerPool) RunUnmanaged(f func() (interface{}, error)) error {
-	w.lock.Lock()
-	defer w.lock.Unlock()
-
-	if len(w.available) == 0 {
-		if w.unmanaged == nil {
-			w.unmanaged = make([]func() (interface{}, error), 1)
-			w.unmanaged[0] = f
-			return nil
-		}
-
-		w.unmanaged = append(w.unmanaged, f)
-		return nil
-	}
-
-	var t *WorkerTask
-
-	if len(w.available) > 0 {
-		t, w.available = w.available[0], w.available[1:]
-		//t, w.available := w.available[len(w.available)-1], w.available[:len(w.available)-1]
-		t.setStatus(Working, nil, nil)
-		t.setManageredStatus(false)
-		t.comm <- f
-	}
-
-	return nil
-}
-
-func (w *WorkerPool) WaitAllStarted() error {
-	// if w.starting == nil {
-	// 	return fmt.Errorf("Pool not started")
-	// }
-
-	// w.starting.Wait()
-
-	return nil
-}
-
-func (w *WorkerPool) WaitAllUnmanaged() error {
-	w.lock.Lock()
-	for {
-		if w.unmanaged == nil || len(w.unmanaged) == 0 {
-			w.lock.Unlock()
-			return nil
-		}
-		w.ucond.Wait()
-
-	}
-	// this point is unreachable
-	// return nil
 }
