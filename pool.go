@@ -22,6 +22,7 @@ type Pool interface {
 	Stop() error
 	PushTask(func() (interface{}, error)) (Task, error)
 	ReleaseTask(Task) error
-	RunUnmanaged(func() (interface{}, error)) error
-	WaitAllUnmanaged() error
+	// RunUnmanaged(func() (interface{}, error)) error
+	// WaitAllUnmanaged() error
+	// WaitAllStarted() error
 }
