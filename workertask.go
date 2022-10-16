@@ -51,7 +51,6 @@ func (wt *WorkerTask) setStatusChan(c *chan int) {
 		default:
 			// was not able to write, skip
 		}
-
 	}
 	wt.bcom = c
 }
@@ -63,6 +62,7 @@ func (wt *WorkerTask) getStatus() WorkStatus {
 	status := wt.status
 	return status
 }
+
 
 func (wt *WorkerTask) setStatus(status WorkStatus, result interface{}, err error) {
 	wt.lock.Lock()
