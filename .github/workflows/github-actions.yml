@@ -12,6 +12,9 @@ jobs:
         with:
           go-version: "1.18.0"
 
+      - name: make lint
+        run: docker run --rm -v ${GITHUB_WORKSPACE}:/app -w /app golangci/golangci-lint:v1.50 golangci-lint run -v
+
       - name: Make tests
         run: go test -v ./...
 
