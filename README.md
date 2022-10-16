@@ -22,18 +22,54 @@ Idea behind the pool is the following usage:
 ```
   pool.Start()
   task, err := working_pool.PushTask(job)
-
+  
   for {
-      if taks.IsFinished() {
+      if task.IsFinished() {
          working_pool.ReleaseTask(task)
          break
       }
   }
+  
   pool.Stop()
 ```
 
+With WorkerTaskQueue it is possible to wait any task done:
+```
+  // checking err is skipped
+  queue := NewWorkerTaskQueue()
+
+  pool.Start()
+  task, err := working_pool.PushTask(job)
+  queue.AddTAsk(task)
+  // Add n tasks to the pool ...
+  task_n, err := working_pool.PushTask(job_n)
+  queue.AddTAsk(task_n)
+  
+  for (i:= 0; i < n; i++) {
+        task_done, err  := queue.WaitTaskFinished()
+        
+        // check result of the task execution is skipped
+        
+        pool.ReleaseTask(task_done)
+  }
+  
+  pool.Stop()
+
+```
+
+In case of un-managed tasks the followig approach could be used:
+```
+  pool.Start()
+  
+  _, err := working_pool.PushTask(job)
+  // check result of the task execution is not needed as well as task releasing
+  
+  pool.Stop()
+
+```
+
 ## Waiting task
-There is WorkerTaskQueue which allows to wait task done. This is very useful in case of managed task and wating for the one or several tasks results.
+WorkerTaskQueue allows wait task done. This is very useful in case of managed task and wating for the one or several tasks results.
 
 ### WorkerTaskQueue definition
 The following methods are implemented in WorkerTaskQueue
@@ -42,13 +78,7 @@ The following methods are implemented in WorkerTaskQueue
   - WaitTaskFinished() (*WorkerTask, error)
   - AddTask(wt *WorkerTask) bool
   - RemoveTask(wt *WorkerTask) bool
- 
- #### NewWorkerTaskQueue()
- #### TaimedWaitTaskFinished(timeout time.Duration) (*WorkerTask, error)
- #### WaitTaskFinished() (*WorkerTask, error)
- #### AddTask(wt *WorkerTask) bool
- #### RemoveTask(wt *WorkerTask) bool
- 
+
  ## WorkerPool
  Pool for the managed jobs, ie result of the execution is important and task will be reused only if the results are retrieved
  
