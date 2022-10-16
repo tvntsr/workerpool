@@ -25,6 +25,7 @@ type WorkerTask struct {
 
 	comm chan func() (interface{}, error)
 	cond *sync.Cond
+	bcom *chan int
 }
 
 func createWorkerTask(id int) (*WorkerTask, error) {
@@ -42,13 +43,26 @@ func createWorkerTask(id int) (*WorkerTask, error) {
 	return &task, nil
 }
 
+func (wt *WorkerTask) setStatusChan(c *chan int) {
+	if wt.bcom != nil {
+		select {
+		case *wt.bcom <- -1:
+			// just do nothing
+		default:
+			// was not able to write, skip
+		}
+	}
+	wt.bcom = c
+}
+
 func (wt *WorkerTask) getStatus() WorkStatus {
 	wt.lock.Lock()
 	defer wt.lock.Unlock()
-	status := wt.status
 
+	status := wt.status
 	return status
 }
+
 
 func (wt *WorkerTask) setStatus(status WorkStatus, result interface{}, err error) {
 	wt.lock.Lock()
@@ -57,6 +71,10 @@ func (wt *WorkerTask) setStatus(status WorkStatus, result interface{}, err error
 	wt.status = status
 	wt.result = result
 	wt.error = err
+
+	if wt.bcom != nil {
+		*wt.bcom <- wt.id
+	}
 
 	wt.cond.Broadcast()
 }
