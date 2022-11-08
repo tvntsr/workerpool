@@ -79,7 +79,7 @@ The following methods are implemented in WorkerTaskQueue
   - AddTask(wt *WorkerTask) bool
   - RemoveTask(wt *WorkerTask) bool
 
- ## WorkerPool
+ ## ManagedPool
  Pool for the managed jobs, ie result of the execution is important and task will be reused only if the results are retrieved
  
  ## UnmanagedPool

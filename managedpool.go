@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-type WorkerPool struct {
+type ManagedPool struct {
 	lock        sync.Mutex
 	max_size    int
 	tasks       map[int]*WorkerTask
@@ -17,9 +17,9 @@ type WorkerPool struct {
 	ucond       *sync.Cond
 }
 
-func NewWorkerPool(size int) (*WorkerPool, error) {
+func NewManagedPool(size int) (*ManagedPool, error) {
 
-	return &WorkerPool{
+	return &ManagedPool{
 		lock:        sync.Mutex{},
 		max_size:    size,
 		tasks:       nil,
@@ -28,7 +28,7 @@ func NewWorkerPool(size int) (*WorkerPool, error) {
 	}, nil
 }
 
-func (w *WorkerPool) markTaskBusy(task *WorkerTask) {
+func (w *ManagedPool) markTaskBusy(task *WorkerTask) {
 	if task.IsAvailable() {
 		w.lock.Lock()
 		defer w.lock.Unlock()
@@ -44,7 +44,7 @@ func (w *WorkerPool) markTaskBusy(task *WorkerTask) {
 	task.setStatus(Working, nil, nil)
 }
 
-func (w *WorkerPool) markTaskTerminated(task *WorkerTask) {
+func (w *ManagedPool) markTaskTerminated(task *WorkerTask) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -61,7 +61,7 @@ func (w *WorkerPool) markTaskTerminated(task *WorkerTask) {
 	w.terminating.Done()
 }
 
-func (w *WorkerPool) markTaskAvailable(task *WorkerTask) error {
+func (w *ManagedPool) markTaskAvailable(task *WorkerTask) error {
 	if task.getStatus() == Available {
 		return nil
 	}
@@ -80,7 +80,7 @@ func (w *WorkerPool) markTaskAvailable(task *WorkerTask) error {
 	return nil
 }
 
-func (w *WorkerPool) Start() error {
+func (w *ManagedPool) Start() error {
 	w.available = make([]*WorkerTask, w.max_size)
 	w.tasks = make(map[int]*WorkerTask)
 	//w.starting = &sync.WaitGroup{}
@@ -122,7 +122,7 @@ func (w *WorkerPool) Start() error {
 	return nil
 }
 
-func (w *WorkerPool) Stop() error {
+func (w *ManagedPool) Stop() error {
 	// ::TODO::
 	// - should be error returned in case when task(s) busy?
 	if w.terminating == nil {
@@ -146,7 +146,7 @@ func (w *WorkerPool) Stop() error {
 	return nil
 }
 
-func (w *WorkerPool) PushTask(f func() (interface{}, error)) (Task, error) {
+func (w *ManagedPool) PushTask(f func() (interface{}, error)) (Task, error) {
 	// ::TODO:: allow grow if max allows it
 
 	w.lock.Lock()
@@ -167,7 +167,7 @@ func (w *WorkerPool) PushTask(f func() (interface{}, error)) (Task, error) {
 	return t, nil
 }
 
-func (w *WorkerPool) ReleaseTask(task Task) error {
+func (w *ManagedPool) ReleaseTask(task Task) error {
 	working_task, ok := task.(*WorkerTask)
 	if !ok {
 		return fmt.Errorf("Wrong task type")

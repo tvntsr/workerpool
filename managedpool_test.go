@@ -5,16 +5,16 @@ import (
 	"time"
 )
 
-func Test_NewWorkerPool(t *testing.T) {
+func Test_NewManagedPool(t *testing.T) {
 	pool_size := 10
 
 	var pool Pool
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Error %v", err)
 	}
 
-	wpool := pool.(*WorkerPool)
+	wpool := pool.(*ManagedPool)
 
 	if wpool.max_size != pool_size {
 		t.Fatal("Wrong pool size")
@@ -29,11 +29,11 @@ func Test_NewWorkerPool(t *testing.T) {
 	}
 }
 
-func Test_WorkerPoolStart(t *testing.T) {
+func Test_ManagedPoolStart(t *testing.T) {
 
 	pool_size := 10
 
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Pool creating error %v", err)
 	}
@@ -52,11 +52,11 @@ func Test_WorkerPoolStart(t *testing.T) {
 	}
 }
 
-func Test_WorkerPoolStop(t *testing.T) {
+func Test_ManagedPoolStop(t *testing.T) {
 
 	pool_size := 10
 
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Pool creating error %v", err)
 	}
@@ -80,10 +80,10 @@ func Test_WorkerPoolStop(t *testing.T) {
 	}
 }
 
-func Test_WorkerPoolPushTask(t *testing.T) {
+func Test_ManagedPoolPushTask(t *testing.T) {
 	pool_size := 2
 
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Pool creating error %v", err)
 	}
@@ -114,10 +114,10 @@ func Test_WorkerPoolPushTask(t *testing.T) {
 	}
 }
 
-func Test_WorkerPoolPushLongTask(t *testing.T) {
+func Test_ManagedPoolPushLongTask(t *testing.T) {
 	pool_size := 2
 
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Pool creating error %v", err)
 	}
@@ -149,10 +149,10 @@ func Test_WorkerPoolPushLongTask(t *testing.T) {
 	}
 }
 
-func Test_WorkerPoolPushTooMuchTasks(t *testing.T) {
+func Test_ManagedPoolPushTooMuchTasks(t *testing.T) {
 	pool_size := 2
 
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Pool creating error %v", err)
 	}
@@ -186,7 +186,7 @@ func Test_WorkerPoolPushTooMuchTasks(t *testing.T) {
 func Test_WorkerPooReleaseTask(t *testing.T) {
 	pool_size := 2
 
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Pool creating error %v", err)
 	}
@@ -232,7 +232,7 @@ func Test_WorkerPooReleaseTask(t *testing.T) {
 func Test_WorkerPooDoubleReleaseTask(t *testing.T) {
 	pool_size := 2
 
-	pool, err := NewWorkerPool(pool_size)
+	pool, err := NewManagedPool(pool_size)
 	if err != nil {
 		t.Fatalf("Pool creating error %v", err)
 	}
