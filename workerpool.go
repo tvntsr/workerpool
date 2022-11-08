@@ -1,5 +1,6 @@
 package pool
 
+// ::TODO:: test case for long run& pool stop immediately
 // ::TODO:: use context to cancel working tasks ?
 
 import (
@@ -8,12 +9,10 @@ import (
 )
 
 type WorkerPool struct {
-	lock sync.Mutex
-
-	max_size  int
-	tasks     map[int]*WorkerTask
-	available []*WorkerTask
-	//starting    *sync.WaitGroup
+	lock        sync.Mutex
+	max_size    int
+	tasks       map[int]*WorkerTask
+	available   []*WorkerTask
 	terminating *sync.WaitGroup
 	ucond       *sync.Cond
 }
@@ -21,11 +20,10 @@ type WorkerPool struct {
 func NewWorkerPool(size int) (*WorkerPool, error) {
 
 	return &WorkerPool{
-		lock:      sync.Mutex{},
-		max_size:  size,
-		tasks:     nil,
-		available: nil,
-		//starting:    nil,
+		lock:        sync.Mutex{},
+		max_size:    size,
+		tasks:       nil,
+		available:   nil,
 		terminating: nil,
 	}, nil
 }
@@ -105,13 +103,13 @@ func (w *WorkerPool) Start() error {
 		go func(task *WorkerTask) {
 			//w.starting.Done()
 			for {
-				worker := <-task.comm
-				if worker == nil {
+				job := <-task.comm
+				if job == nil {
 					w.markTaskTerminated(task)
 					break
 				}
 				w.markTaskBusy(task)
-				res, err := worker()
+				res, err := job()
 				if err != nil {
 					task.setStatus(Error, res, err)
 				} else {

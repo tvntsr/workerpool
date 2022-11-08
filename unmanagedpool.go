@@ -41,24 +41,6 @@ func (w *UnmanagedPool) markTaskTerminated(task *WorkerTask) {
 	w.terminating.Done()
 }
 
-// func (w *UnmanagedPool) markTaskAvailable(task *WorkerTask) error {
-// 	if task.getStatus() == Available {
-// 		return nil
-// 	}
-
-// 	w.lock.Lock()
-// 	defer w.lock.Unlock()
-
-// 	_, ok := w.tasks[task.id]
-// 	if !ok {
-// 		return fmt.Errorf("Bad task")
-// 	}
-
-// 	task.setStatus(Available, nil, nil)
-
-// 	return nil
-// }
-
 func (w *UnmanagedPool) getUnmanageredWork() func() (interface{}, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
